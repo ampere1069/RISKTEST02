@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>風險分析評估</title>
+    <style>
+        :root {
+            --critical: #d32f2f;
+            --high: #f57c00;
+            --medium: #fbc02d;
+            --low: #388e3c;
+            --primary: #1976d2;
+            --dark: #212121;
+            --light: #f5f5f5;
+            --background: #ffffff;
+            --glow: 0 0 20px rgba(25, 118, 210, 0.1);
+            --neon: 0 0 10px rgba(25, 118, 210, 0.2);
+            --card-bg: #ffffff;
+            --slide-bg: #ffffff;
+            --border: #e0e0e0;
+            --text-dark: #212121;
+            --text-medium: #616161;
+            --text-light: #9e9e9e;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Helvetica Neue', 'Microsoft JhengHei', 'PingFang TC', sans-serif;
+        }
+        
+        body {
+            background: var(--background);
+            min-height: 100vh;
+            color: var(--text-dark);
+            overflow: hidden;
+            position: relative;
+        }
+        
+        /* 簡報容器 */
+        .presentation-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        /* 進度條 */
+        .progress-bar {
+            height: 4px;
+            background: #f5f5f5;
+            position: relative;
+            margin: 0 100px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), #42a5f5);
+            width: 0%;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+        
+        /* 幻燈片容器 */
+        .slides-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 40px 100px;
+            display: none;
+            opacity: 0;
+            transform: translateY(50px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+            overflow-y: auto;
+        }
+        
+        .slide.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .slide.next {
+            display: block;
+            opacity: 0;
+            transform: translateY(50px);
+        }
+        
+        .slide.prev {
+            display: block;
+            opacity: 0;
+            transform: translateY(-50px);
+        }
+        
+        /* 控制台 */
+        .controls {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            gap: 15px;
+            z-index: 1000;
+        }
+        
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 2px solid var(--primary);
+            background: white;
+            color: var(--primary);
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .control-btn:hover {
+            background: var(--primary);
+            color: white;
+            transform: scale(1.1);
+            box-shadow: var(--glow);
+        }
+        
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* 導航指示器 */
+        .nav-indicator {
+            position: fixed;
+            right: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            z-index: 1000;
+        }
+        
+        .nav-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-dot.active {
+            background: var(--primary);
+            transform: scale(1.3);
+            box-shadow: 0 0 10px rgba(25, 118, 210, 0.3);
+        }
+        
+        .nav-dot:hover {
+            background: var(--primary);
+            transform: scale(1.2);
+        }
+        
+        /* 簡報標題 */
+        .slide-title {
+            font-size: 3.5rem;
+            font-weight: 900;
+            margin-bottom: 40px;
+            text-align: center;
+            color: var(--primary);
+            position: relative;
+            opacity: 0;
+            transform: translateY(-30px);
+            animation: slideDown 0.8s ease forwards;
+        }
+        
+        @keyframes slideDown {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* 簡報內容 */
+        .slide-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            opacity: 0;
+            transform: translateY(30px);
+            animation: slideUp 0.8s ease 0.3s forwards;
+        }
+        
+        @keyframes slideUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* 卡片樣式 */
+        .card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), #42a5f5);
+        }
+        
+        /* 風險摘要卡片 */
+        .risk-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+        
+        .summary-card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            border: 2px solid transparent;
+            transition: all 0.4s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.05);
+        }
+        
+        .summary-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, transparent 30%, rgba(25, 118, 210, 0.02) 100%);
+        }
+        
+        .summary-card:hover {
+            transform: translateY(-10px);
+            box-shadow: var(--glow);
+        }
+        
+        .summary-card.critical-count { border-color: rgba(211, 47, 47, 0.3); }
+        .summary-card.high-count { border-color: rgba(245, 124, 0, 0.3); }
+        .summary-card.medium-count { border-color: rgba(251, 192, 45, 0.3); }
+        .summary-card.low-count { border-color: rgba(56, 142, 60, 0.3); }
+        
+        .summary-card.critical-count:hover { box-shadow: 0 0 30px rgba(211, 47, 47, 0.1); }
+        .summary-card.high-count:hover { box-shadow: 0 0 30px rgba(245, 124, 0, 0.1); }
+        .summary-card.medium-count:hover { box-shadow: 0 0 30px rgba(251, 192, 45, 0.1); }
+        .summary-card.low-count:hover { box-shadow: 0 0 30px rgba(56, 142, 60, 0.1); }
+        
+        .summary-value {
+            font-size: 4rem;
+            font-weight: 900;
+            margin: 20px 0;
+        }
+        
+        .critical-count .summary-value { color: var(--critical); }
+        .high-count .summary-value { color: var(--high); }
+        .medium-count .summary-value { color: var(--medium); }
+        .low-count .summary-value { color: var(--low); }
+        
+        .summary-label {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+        
+        /* 風險項目 */
+        .risk-item {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-left: 5px solid #ccc;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
+        }
+        
+        .risk-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, transparent 30%, rgba(25, 118, 210, 0.02) 100%);
+        }
+        
+        .risk-item:hover {
+            transform: translateX(10px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+        }
+        
+        .risk-item.critical { border-left-color: var(--critical); }
+        .risk-item.high { border-left-color: var(--high); }
+        .risk-item.medium { border-left-color: var(--medium); }
+        .risk-item.low { border-left-color: var(--low); }
+        
+        .risk-title {
+            font-size: 2.2rem;
+            font-weight: 900;
+            margin-bottom: 15px;
+            color: var(--text-dark);
+        }
+        
+        .risk-score {
+            position: absolute;
+            right: 25px;
+            top: 25px;
+            font-weight: 900;
+            font-size: 2.4rem;
+            padding: 10px 20px;
+            border-radius: 20px;
+            color: white;
+        }
+        
+        .critical .risk-score { background-color: var(--critical); }
+        .high .risk-score { background-color: var(--high); }
+        .medium .risk-score { background-color: var(--medium); }
+        .low .risk-score { background-color: var(--low); }
+        
+        /* 動畫元素 */
+        .animated-element {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.6s ease;
+        }
+        
+        .animated-element.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        /* 高光效果 */
+        .highlight {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .highlight::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 8px;
+            background: linear-gradient(90deg, transparent, rgba(25, 118, 210, 0.2), transparent);
+            opacity: 0.5;
+            animation: highlightPulse 2s infinite;
+        }
+        
+        @keyframes highlightPulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.7; }
+        }
+        
+        /* 表格樣式 */
+        .priority-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-top: 30px;
+            font-size: 1.4rem;
+            border-radius: 15px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        
+        .priority-table th, .priority-table td {
+            padding: 20px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .priority-table th {
+            background: #f5f5f5;
+            color: var(--text-dark);
+            font-weight: 900;
+            font-size: 1.6rem;
+            position: sticky;
+            top: 0;
+        }
+        
+        .priority-table tr:hover {
+            background: #f9f9f9;
+        }
+        
+        /* 簡報頁碼 */
+        .slide-number {
+            position: absolute;
+            bottom: 30px;
+            left: 100px;
+            font-size: 1.4rem;
+            color: var(--text-light);
+            font-weight: 700;
+        }
+        
+        /* 更新通知 */
+        .update-notice {
+            background: #fff8e1;
+            border-left: 5px solid #ffc107;
+            padding: 25px;
+            margin-bottom: 30px;
+            border-radius: 15px;
+        }
+        
+        .update-notice h3 {
+            color: #856404;
+            margin-top: 0;
+            font-size: 2rem;
+        }
+        
+        .update-notice p {
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: #856404;
+            line-height: 1.6;
+        }
+        
+        /* 響應式設計 */
+        @media (max-width: 1200px) {
+            .slide {
+                padding: 40px 60px;
+            }
+            
+            .progress-bar {
+                margin: 0 60px;
+            }
+            
+            .slide-number {
+                left: 60px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .slide {
+                padding: 30px 20px;
+            }
+            
+            .slide-title {
+                font-size: 2.8rem;
+            }
+            
+            .progress-bar {
+                margin: 0 20px;
+            }
+            
+            .controls {
+                bottom: 20px;
+                right: 20px;
+            }
+            
+            .control-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+            
+            .nav-indicator {
+                right: 20px;
+            }
+            
+            .slide-number {
+                left: 20px;
+                bottom: 20px;
+            }
+            
+            .risk-summary {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .risk-summary {
+                grid-template-columns: 1fr;
+            }
+            
+            .slide-title {
+                font-size: 2.2rem;
+            }
+            
+            .card {
+                padding: 25px;
+            }
+        }
+        
+        /* 歡迎畫面 */
+        .welcome-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            transition: opacity 0.8s ease;
+        }
+        
+        .welcome-title {
+            font-size: 4rem;
+            font-weight: 900;
+            margin-bottom: 30px;
+            color: var(--primary);
+            text-align: center;
+        }
+        
+        .welcome-subtitle {
+            font-size: 1.8rem;
+            color: var(--text-medium);
+            margin-bottom: 50px;
+            text-align: center;
+            max-width: 600px;
+        }
+        
+        .start-button {
+            padding: 20px 50px;
+            font-size: 1.8rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), #42a5f5);
+            border: none;
+            border-radius: 15px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 25px rgba(25, 118, 210, 0.2);
+        }
+        
+        .start-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 35px rgba(25, 118, 210, 0.3);
+        }
+        
+        .welcome-instructions {
+            margin-top: 40px;
+            color: var(--text-light);
+            font-size: 1.4rem;
+            text-align: center;
+        }
+        
+        /* 風險等級標籤 */
+        .risk-level-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 900;
+            font-size: 1.2rem;
+            display: inline-block;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .critical-badge {
+            background-color: rgba(211, 47, 47, 0.1);
+            color: var(--critical);
+            border: 1px solid rgba(211, 47, 47, 0.2);
+        }
+        
+        .high-badge {
+            background-color: rgba(245, 124, 0, 0.1);
+            color: var(--high);
+            border: 1px solid rgba(245, 124, 0, 0.2);
+        }
+        
+        .medium-badge {
+            background-color: rgba(251, 192, 45, 0.1);
+            color: var(--medium);
+            border: 1px solid rgba(251, 192, 45, 0.2);
+        }
+        
+        .low-badge {
+            background-color: rgba(56, 142, 60, 0.1);
+            color: var(--low);
+            border: 1px solid rgba(56, 142, 60, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <!-- 歡迎畫面 -->
+    <div class="welcome-overlay" id="welcomeOverlay">
+        <h1 class="welcome-title">風險分析評估</h1>
+        <p class="welcome-subtitle">專案風險管理分析與評估</p>
+        <button class="start-button" id="startButton">開始簡報</button>
+        <div class="welcome-instructions">
+            <p>使用 ← → 方向鍵或點擊按鈕進行導覽</p>
+        </div>
+    </div>
+    
+    <!-- 簡報容器 -->
+    <div class="presentation-container" id="presentationContainer" style="display: none;">
+        <!-- 進度條 -->
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        
+        <!-- 幻燈片容器 -->
+        <div class="slides-container" id="slidesContainer">
+            <!-- 幻燈片 1: 風險摘要 -->
+            <div class="slide active" id="slide1">
+                <h1 class="slide-title">風險摘要概覽</h1>
+                <div class="slide-content">
+                    <div class="card">
+                        <div class="update-notice">
+                            <h3>說明</h3>
+                            <p>顯示5個經確認的風險項目，並排列優先級。</p>
+                        </div>
+                        
+                        <p style="font-size: 1.8rem; color: var(--text-medium); margin-bottom: 30px; text-align: center;">
+                            根據風險評估矩陣(發生機率 × 影響程度)，所有風險項目分為四個等級
+                        </p>
+                        
+                        <div class="risk-summary">
+                            <div class="summary-card critical-count animated-element">
+                                <div class="summary-value" id="criticalCount">0</div>
+                                <div class="summary-label">極高風險項目</div>
+                                <div style="font-size: 1.4rem; color: var(--text-light); margin-top: 15px;">
+                                    風險評分: 16-25分
+                                </div>
+                            </div>
+                            <div class="summary-card high-count animated-element">
+                                <div class="summary-value" id="highCount">0</div>
+                                <div class="summary-label">高風險項目</div>
+                                <div style="font-size: 1.4rem; color: var(--text-light); margin-top: 15px;">
+                                    風險評分: 10-15分
+                                </div>
+                            </div>
+                            <div class="summary-card medium-count animated-element">
+                                <div class="summary-value" id="mediumCount">0</div>
+                                <div class="summary-label">中風險項目</div>
+                                <div style="font-size: 1.4rem; color: var(--text-light); margin-top: 15px;">
+                                    風險評分: 5-9分
+                                </div>
+                            </div>
+                            <div class="summary-card low-count animated-element">
+                                <div class="summary-value" id="lowCount">0</div>
+                                <div class="summary-label">低風險項目</div>
+                                <div style="font-size: 1.4rem; color: var(--text-light); margin-top: 15px;">
+                                    風險評分: 1-4分
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 40px; text-align: center;">
+                            <p style="font-size: 1.6rem; color: var(--text-medium);">
+                                <span class="highlight">處理建議：</span> 優先處理風險評分≥12分的項目，並建立監控機制處理評分≥8分的項目。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="slide-number">第 1 頁，共 6 頁</div>
+            </div>
+            
+            <!-- 風險項目詳細分析幻燈片 (5個) -->
+            <!-- 這些將由JavaScript動態生成 -->
+            
+            <!-- 幻燈片 6: 總結 -->
+            <div class="slide" id="slide6">
+                <h1 class="slide-title">風險管理總結</h1>
+                <div class="slide-content">
+                    <div class="card">
+                        <h2 style="font-size: 2.5rem; margin-bottom: 30px; color: var(--primary);">優先級排序與處理策略</h2>
+                        
+                        <table class="priority-table">
+                            <thead>
+                                <tr>
+                                    <th>優先級</th>
+                                    <th>風險項目</th>
+                                    <th>風險評分</th>
+                                    <th>風險等級</th>
+                                    <th>處理建議</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summaryTableBody">
+                                <!-- 將由JavaScript動態生成 -->
+                            </tbody>
+                        </table>
+                        
+                        <div style="margin-top: 40px; padding: 30px; background: rgba(56, 142, 60, 0.05); border-radius: 15px; border-left: 5px solid var(--low);">
+                            <h3 style="font-size: 2rem; margin-bottom: 20px; color: var(--text-dark);">關鍵行動項目</h3>
+                            <ol style="font-size: 1.6rem; color: var(--text-medium); line-height: 1.8; padding-left: 25px;">
+                                <li style="margin-bottom: 15px;">立即處理第1優先級「索賠權利喪失」風險，盡速完成合約管理文件夾</li>
+                                <li style="margin-bottom: 15px;">優先處理第2-3優先級高風險項目，建立發文管控機制</li>
+                                <li style="margin-bottom: 15px;">監控第4優先級中風險項目，實施費用歸類策略</li>
+                                <li>持續改善第5優先級低風險項目，完善記錄系統</li>
+                            </ol>
+                        </div>
+                        
+                        <div style="margin-top: 40px; padding: 25px; background: #f5f5f5; border-radius: 15px;">
+                            <h3 style="font-size: 1.8rem; margin-bottom: 15px; color: var(--text-dark);">風險評估方法說明</h3>
+                            <p style="font-size: 1.5rem; color: var(--text-medium); line-height: 1.6; margin-bottom: 10px;">
+                                <strong>風險評分計算：</strong>發生機率(1-5分) × 影響程度(1-5分) = 風險評分(1-25分)
+                            </p>
+                            <p style="font-size: 1.5rem; color: var(--text-medium); line-height: 1.6;">
+                                <strong>風險等級分類：</strong>極高風險 (16-25分) | 高風險 (10-15分) | 中風險 (5-9分) | 低風險 (1-4分)
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="slide-number">第 6 頁，共 6 頁</div>
+            </div>
+        </div>
+        
+        <!-- 導航指示器 -->
+        <div class="nav-indicator" id="navIndicator">
+            <!-- 將由JavaScript動態生成 -->
+        </div>
+        
+        <!-- 控制按鈕 -->
+        <div class="controls">
+            <button class="control-btn" id="prevBtn">←</button>
+            <button class="control-btn" id="nextBtn">→</button>
+            <button class="control-btn" id="homeBtn">⌂</button>
+        </div>
+    </div>
+
+    <script>
+        // 風險數據
+        const riskData = [
+            {
+                id: 1,
+                name: "索賠權利喪失",
+                probability: 4,
+                impact: 5,
+                description: "未在合約規定期限內提出展延或變更通知，或因人員更迭導致證據遺失，將喪失求償權利。",
+                mitigation: "1. 盡速完成合約管理文件夾 2. 強制發文機制：發生延遲事件(不可歸責我方)必須發文業主，並在每月發文中明確列出「累計預期延誤天數」。",
+                reasons: "一旦發生將造成重大財務損失影響公司權益",
+                priority: 1
+            },
+            {
+                id: 2,
+                name: "分包商索賠與反向求償失敗",
+                probability: 4,
+                impact: 4,
+                description: "未詳細記錄分包商延誤天數或未經同意的變更： 舉例因配合業主調整CBS未先取得分包商書面同意，分包商日後可能據此主張額外費用。",
+                mitigation: "1. 執行發文管控 2. 背對背協議",
+                reasons: "合作夥伴及分包商管理複雜度高，需系統化記錄與協議",
+                priority: 2
+            },
+            {
+                id: 3,
+                name: "共同遲延",
+                probability: 3,
+                impact: 4,
+                description: "在未獲准展延前，因配合業主或PCM口頭指示而調整CBS，將被視為「默認」或「自願」延期。",
+                mitigation: "1. 堅持依原核定進度（Baseline）執行與申報，除非收到「正式書面契約變更指令」。 2. 保留權利聲明:若必須配合調整，發文中須註明「係配合機關指示」且「非可歸責於我方」，並主張適用合約第4條（直接工程費）而非第7條，以保留費用請求權。",
+                reasons: "業主口頭指示常見，若未書面記錄易導致權利喪失",
+                priority: 3
+            },
+            {
+                id: 4,
+                name: "費用補償上限限制",
+                probability: 5,
+                impact: 3,
+                description: "合約條款第7條將管理費補償上限訂為1.25%，導致實際展延成本無法全額回收。",
+                mitigation: "費用歸類策略：將費用歸類為「直接工程費」以突破限制（合約第4條或配合施工條款）",
+                reasons: "合約明定上限，但可透過費用歸類策略減輕影響",
+                priority: 4
+            },
+            {
+                id: 5,
+                name: "人力費用與資源重複計價風險",
+                probability: 2,
+                impact: 3,
+                description: "業主質疑展延人力成本有「虛報」或「跨專案重複計價」，導致求償被拒。",
+                mitigation: "1. 建立完整工時紀錄 2. 改用單價分析:建議採用「直接人工單價建議值」作為計算基準，而非僅提供個人薪資單，以減少個資爭議並標準化求償金額。",
+                reasons: "透過完善工時紀錄及佐證可有效預防，影響相對可控",
+                priority: 5
+            }
+        ];
+
+        // 計算風險評分和等級
+        riskData.forEach(risk => {
+            risk.score = risk.probability * risk.impact;
+            risk.level = getRiskLevel(risk.score);
+        });
+
+        // 簡報狀態
+        const presentationState = {
+            currentSlide: 0,
+            totalSlides: 6, // 1摘要 + 5風險項目 + 1總結
+            animationDelay: 300,
+            isAnimating: false
+        };
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 設置開始按鈕事件
+            document.getElementById('startButton').addEventListener('click', startPresentation);
+            
+            // 設置控制按鈕事件
+            document.getElementById('prevBtn').addEventListener('click', prevSlide);
+            document.getElementById('nextBtn').addEventListener('click', nextSlide);
+            document.getElementById('homeBtn').addEventListener('click', goToHome);
+            
+            // 設置鍵盤事件
+            document.addEventListener('keydown', handleKeyPress);
+            
+            // 生成風險項目幻燈片
+            generateRiskSlides();
+            
+            // 生成導航指示器
+            generateNavIndicator();
+            
+            // 更新摘要計數
+            updateSummaryCounts();
+            
+            // 生成總結表格
+            generateSummaryTable();
+            
+            // 設置風險項目點擊事件
+            setTimeout(setupRiskItemClicks, 500);
+        });
+
+        function startPresentation() {
+            // 隱藏歡迎畫面
+            const welcomeOverlay = document.getElementById('welcomeOverlay');
+            welcomeOverlay.style.opacity = '0';
+            
+            setTimeout(() => {
+                welcomeOverlay.style.display = 'none';
+                document.getElementById('presentationContainer').style.display = 'flex';
+                
+                // 初始化第一個幻燈片
+                presentationState.currentSlide = 0;
+                updatePresentation();
+            }, 800);
+        }
+
+        function generateRiskSlides() {
+            const slidesContainer = document.getElementById('slidesContainer');
+            
+            // 插入風險項目幻燈片 (放在第1頁之後，最後一頁之前)
+            riskData.forEach((risk, index) => {
+                const slideNum = index + 1; // 第1頁是摘要，風險從第2頁開始
+                const slideId = `riskSlide${risk.id}`;
+                
+                // 根據風險等級決定顏色和徽章
+                let levelColor = getRiskLevelColor(risk.level);
+                let levelText = getRiskLevelText(risk.score);
+                let badgeClass = getRiskBadgeClass(risk.level);
+                
+                const slideHTML = `
+                    <div class="slide" id="${slideId}">
+                        <h1 class="slide-title">${risk.priority}. ${risk.name}</h1>
+                        <div class="slide-content">
+                            <div class="card">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 20px;">
+                                    <div style="background: ${levelColor}10; border: 2px solid ${levelColor}30; padding: 15px 30px; border-radius: 15px; flex: 1;">
+                                        <div style="font-size: 1.6rem; color: var(--text-medium); margin-bottom: 10px;">風險評分</div>
+                                        <div style="font-size: 4rem; font-weight: 900; color: ${levelColor};">${risk.score}/25</div>
+                                        <div style="margin-top: 15px;">
+                                            <span class="risk-level-badge ${badgeClass}">${levelText.split('(')[0].trim()}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="flex: 2;">
+                                        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                                            <div style="flex: 1; min-width: 150px; background: rgba(25, 118, 210, 0.05); padding: 20px; border-radius: 15px; border: 1px solid rgba(25, 118, 210, 0.1);">
+                                                <div style="font-size: 1.6rem; color: var(--text-medium); margin-bottom: 10px;">發生機率</div>
+                                                <div style="font-size: 3rem; font-weight: 900; color: var(--primary);">${risk.probability}/5</div>
+                                                <div style="font-size: 1.4rem; color: var(--text-light); margin-top: 10px;">${getProbabilityText(risk.probability)}</div>
+                                            </div>
+                                            <div style="flex: 1; min-width: 150px; background: rgba(245, 124, 0, 0.05); padding: 20px; border-radius: 15px; border: 1px solid rgba(245, 124, 0, 0.1);">
+                                                <div style="font-size: 1.6rem; color: var(--text-medium); margin-bottom: 10px;">影響程度</div>
+                                                <div style="font-size: 3rem; font-weight: 900; color: var(--high);">${risk.impact}/5</div>
+                                                <div style="font-size: 1.4rem; color: var(--text-light); margin-top: 10px;">${getImpactText(risk.impact)}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div style="margin: 40px 0;">
+                                    <h3 style="font-size: 2rem; margin-bottom: 20px; color: var(--primary);">風險描述</h3>
+                                    <div style="background: #f9f9f9; padding: 25px; border-radius: 15px; border-left: 5px solid ${levelColor};">
+                                        <p style="font-size: 1.8rem; color: var(--text-dark); line-height: 1.7; font-weight: 500;">${risk.description}</p>
+                                    </div>
+                                </div>
+                                
+                                <div style="margin: 40px 0;">
+                                    <h3 style="font-size: 2rem; margin-bottom: 20px; color: var(--primary);">評估理由</h3>
+                                    <div style="background: rgba(56, 142, 60, 0.05); padding: 25px; border-radius: 15px; border-left: 5px solid var(--low);">
+                                        <p style="font-size: 1.8rem; color: var(--text-dark); line-height: 1.7; font-weight: 500;">${risk.reasons}</p>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h3 style="font-size: 2rem; margin-bottom: 20px; color: var(--primary);">因應對策</h3>
+                                    <div style="background: rgba(245, 124, 0, 0.05); padding: 25px; border-radius: 15px; border-left: 5px solid var(--high);">
+                                        <p style="font-size: 1.8rem; color: var(--text-dark); line-height: 1.7; font-weight: 500;">${risk.mitigation}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="slide-number">第 ${slideNum + 1} 頁，共 6 頁</div>
+                    </div>
+                `;
+                
+                // 在最後一頁之前插入
+                const lastSlide = document.getElementById('slide6');
+                lastSlide.insertAdjacentHTML('beforebegin', slideHTML);
+            });
+        }
+
+        function generateNavIndicator() {
+            const navIndicator = document.getElementById('navIndicator');
+            navIndicator.innerHTML = '';
+            
+            for (let i = 0; i < presentationState.totalSlides; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'nav-dot';
+                dot.dataset.slide = i;
+                dot.addEventListener('click', () => goToSlide(i));
+                navIndicator.appendChild(dot);
+            }
+            
+            // 設置第一個點為活動狀態
+            navIndicator.children[0].classList.add('active');
+        }
+
+        function generateSummaryTable() {
+            const tableBody = document.getElementById('summaryTableBody');
+            tableBody.innerHTML = '';
+            
+            // 按優先級排序
+            const sortedRisks = [...riskData].sort((a, b) => a.priority - b.priority);
+            
+            sortedRisks.forEach(risk => {
+                const row = document.createElement('tr');
+                
+                // 風險等級顏色和徽章
+                let levelColor = getRiskLevelColor(risk.level);
+                let levelText = getRiskLevelText(risk.score).split('(')[0].trim();
+                let badgeClass = getRiskBadgeClass(risk.level);
+                
+                // 處理建議
+                let action = '';
+                let actionColor = '';
+                if (risk.priority === 1) {
+                    action = '立即處理';
+                    actionColor = 'color: var(--critical); font-weight: 900;';
+                } else if (risk.priority <= 3) {
+                    action = '優先處理';
+                    actionColor = 'color: var(--high); font-weight: 900;';
+                } else if (risk.priority === 4) {
+                    action = '監控處理';
+                    actionColor = 'color: var(--medium); font-weight: 900;';
+                } else {
+                    action = '持續改善';
+                    actionColor = 'color: var(--low); font-weight: 900;';
+                }
+                
+                row.innerHTML = `
+                    <td>
+                        <span style="background: ${levelColor}10; color: ${levelColor}; padding: 8px 16px; border-radius: 10px; font-weight: 900; border: 1px solid ${levelColor}30;">
+                            第${risk.priority}優先
+                        </span>
+                    </td>
+                    <td><strong style="color: var(--text-dark);">${risk.name}</strong></td>
+                    <td><strong style="color: ${levelColor};">${risk.score}/25</strong></td>
+                    <td><span class="risk-level-badge ${badgeClass}">${levelText}</span></td>
+                    <td><span style="${actionColor}">${action}</span></td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        }
+
+        function updateSummaryCounts() {
+            const criticalCount = riskData.filter(r => r.level === 'critical').length;
+            const highCount = riskData.filter(r => r.level === 'high').length;
+            const mediumCount = riskData.filter(r => r.level === 'medium').length;
+            const lowCount = riskData.filter(r => r.level === 'low').length;
+            
+            document.getElementById('criticalCount').textContent = criticalCount;
+            document.getElementById('highCount').textContent = highCount;
+            document.getElementById('mediumCount').textContent = mediumCount;
+            document.getElementById('lowCount').textContent = lowCount;
+        }
+
+        function setupRiskItemClicks() {
+            // 在摘要頁面，點擊風險卡片跳轉到對應的風險詳情頁面
+            const summaryCards = document.querySelectorAll('.summary-card');
+            summaryCards.forEach((card, index) => {
+                card.addEventListener('click', () => {
+                    // 極高風險卡片跳轉到第1個風險項目
+                    // 高風險卡片跳轉到第2個風險項目
+                    // 中風險卡片跳轉到第4個風險項目
+                    // 低風險卡片跳轉到第5個風險項目
+                    let targetSlide = 0;
+                    if (card.classList.contains('critical-count')) targetSlide = 1; // 第2頁
+                    else if (card.classList.contains('high-count')) targetSlide = 2; // 第3頁
+                    else if (card.classList.contains('medium-count')) targetSlide = 3; // 第4頁
+                    else if (card.classList.contains('low-count')) targetSlide = 4; // 第5頁
+                    
+                    goToSlide(targetSlide);
+                });
+            });
+        }
+
+        function updatePresentation() {
+            if (presentationState.isAnimating) return;
+            presentationState.isAnimating = true;
+            
+            // 更新進度條
+            const progressPercent = ((presentationState.currentSlide + 1) / presentationState.totalSlides) * 100;
+            document.getElementById('progressFill').style.width = `${progressPercent}%`;
+            
+            // 更新導航點
+            const navDots = document.querySelectorAll('.nav-dot');
+            navDots.forEach((dot, index) => {
+                if (index === presentationState.currentSlide) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            });
+            
+            // 更新幻燈片
+            const slides = document.querySelectorAll('.slide');
+            slides.forEach((slide, index) => {
+                slide.classList.remove('active', 'prev', 'next');
+                
+                if (index === presentationState.currentSlide) {
+                    slide.classList.add('active');
+                    
+                    // 觸發動畫元素
+                    setTimeout(() => {
+                        const animatedElements = slide.querySelectorAll('.animated-element');
+                        animatedElements.forEach((element, i) => {
+                            setTimeout(() => {
+                                element.classList.add('visible');
+                            }, i * 100);
+                        });
+                    }, 300);
+                } else if (index < presentationState.currentSlide) {
+                    slide.classList.add('prev');
+                } else {
+                    slide.classList.add('next');
+                }
+            });
+            
+            // 更新幻燈片編號
+            const slideNumbers = document.querySelectorAll('.slide-number');
+            slideNumbers.forEach((number, index) => {
+                if (index === presentationState.currentSlide) {
+                    number.textContent = `第 ${index + 1} 頁，共 ${presentationState.totalSlides} 頁`;
+                }
+            });
+            
+            // 重置動畫鎖定
+            setTimeout(() => {
+                presentationState.isAnimating = false;
+            }, 800);
+        }
+
+        function nextSlide() {
+            if (presentationState.currentSlide < presentationState.totalSlides - 1) {
+                presentationState.currentSlide++;
+                updatePresentation();
+            } else {
+                // 如果是最後一頁，回到第一頁
+                presentationState.currentSlide = 0;
+                updatePresentation();
+            }
+        }
+
+        function prevSlide() {
+            if (presentationState.currentSlide > 0) {
+                presentationState.currentSlide--;
+                updatePresentation();
+            }
+        }
+
+        function goToSlide(slideIndex) {
+            if (slideIndex >= 0 && slideIndex < presentationState.totalSlides) {
+                presentationState.currentSlide = slideIndex;
+                updatePresentation();
+            }
+        }
+
+        function goToHome() {
+            goToSlide(0);
+        }
+
+        function handleKeyPress(event) {
+            switch(event.key) {
+                case 'ArrowLeft':
+                case 'PageUp':
+                    prevSlide();
+                    break;
+                case 'ArrowRight':
+                case 'PageDown':
+                case ' ':
+                    nextSlide();
+                    break;
+                case 'Home':
+                    goToHome();
+                    break;
+                case 'Escape':
+                    // 顯示歡迎畫面
+                    document.getElementById('presentationContainer').style.display = 'none';
+                    document.getElementById('welcomeOverlay').style.display = 'flex';
+                    document.getElementById('welcomeOverlay').style.opacity = '1';
+                    break;
+            }
+        }
+
+        // 輔助函數
+        function getRiskLevel(score) {
+            if (score >= 16) return 'critical';
+            if (score >= 10) return 'high';
+            if (score >= 5) return 'medium';
+            return 'low';
+        }
+        
+        function getRiskLevelColor(level) {
+            switch(level) {
+                case 'critical': return '#d32f2f';
+                case 'high': return '#f57c00';
+                case 'medium': return '#fbc02d';
+                case 'low': return '#388e3c';
+                default: return '#1976d2';
+            }
+        }
+        
+        function getRiskBadgeClass(level) {
+            switch(level) {
+                case 'critical': return 'critical-badge';
+                case 'high': return 'high-badge';
+                case 'medium': return 'medium-badge';
+                case 'low': return 'low-badge';
+                default: return '';
+            }
+        }
+        
+        function getRiskLevelText(score) {
+            if (score >= 16) return '極高風險 (需立即處理)';
+            if (score >= 10) return '高風險 (需優先處理)';
+            if (score >= 5) return '中風險 (需監控處理)';
+            return '低風險 (可接受)';
+        }
+        
+        function getProbabilityText(probability) {
+            const texts = ['', '極低', '低', '中等', '高', '極高'];
+            return texts[probability] || '未知';
+        }
+        
+        function getImpactText(impact) {
+            const texts = ['', '極低', '低', '中等', '高', '極高'];
+            return texts[impact] || '未知';
+        }
+    </script>
+</body>
+</html>
